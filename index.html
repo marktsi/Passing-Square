@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passing Square</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0a; font-family: 'Barlow', sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px; color: #fff;
+  }
+
+  .header { text-align: center; margin-bottom: 14px; }
+  .header h1 {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 22px;
+    letter-spacing: 2px; text-transform: uppercase; color: #C61D23;
+  }
+  .header p { font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .phase-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; color: #fff; background: #C61D23;
+    padding: 4px 16px; margin-bottom: 12px; min-width: 290px; text-align: center;
+  }
+
+  .scene { position: relative; width: 400px; height: 580px; }
+
+  .field {
+    position: absolute; top: 30px; left: 40px; width: 320px; height: 520px;
+    background: #1a5c1a; border: 2px solid rgba(255,255,255,0.7); border-radius: 2px;
+  }
+  .field::before {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(180deg, transparent, transparent 52px,
+      rgba(255,255,255,0.04) 52px, rgba(255,255,255,0.04) 104px);
+  }
+
+  /* Progression banner — flashes up across the top of the green */
+  .banner {
+    position: absolute; left: 50%; transform: translateX(-50%); top: 42px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700;
+    letter-spacing: 5px; text-transform: uppercase; text-indent: 5px;
+    color: #ffffff;
+    -webkit-text-stroke: 0.9px #C61D23;
+    paint-order: stroke fill;   /* red edging sits outside the glyph, white stays crisp */
+    text-shadow: 0 0 6px rgba(198,29,35,0.55);
+    background: rgba(8,8,8,0.94); border: 1px solid #C61D23;
+    padding: 6px 24px; white-space: nowrap;
+    opacity: 0; transition: opacity 0.35s; z-index: 40; pointer-events: none;
+  }
+  /* Long-form banner — a full sentence, so it wraps and drops in size */
+  .banner.long {
+    font-size: 12px; font-weight: 600; letter-spacing: 1.5px; text-indent: 1.5px;
+    white-space: normal; max-width: 296px; text-align: center; line-height: 1.45;
+    padding: 7px 16px;
+  }
+  .banner.show { opacity: 1; animation: bannerFlash 1.5s ease-in-out; }
+  @keyframes bannerFlash {
+    0%,100% { opacity: 1 } 20% { opacity: 0.15 } 40% { opacity: 1 } 60% { opacity: 0.15 }
+  }
+
+  /* Grid label */
+  .grid-label {
+    position: absolute; font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    color: rgba(255,255,255,0.7); z-index: 12; white-space: nowrap;
+  }
+
+  /* ── Players ── */
+  .player {
+    position: absolute; width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 700; color: #fff;
+    border: 2px solid rgba(255,255,255,0.3);
+    /* 0.45s delay: the ball travels first, the players follow it */
+    transition: left 0.85s cubic-bezier(0.4,0,0.2,1) 0.45s,
+                top  0.85s cubic-bezier(0.4,0,0.2,1) 0.45s;
+    z-index: 10;
+  }
+  .player.blue { background: #1a6eb5; box-shadow: 0 0 8px rgba(26,110,181,0.5); }
+
+  /* Ball */
+  .ball {
+    position: absolute; width: 13px; height: 13px; border-radius: 50%;
+    background: #fff; border: 1px solid #bbb; z-index: 20;
+    transition: left 0.85s cubic-bezier(0.4,0,0.2,1), top 0.85s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 0 0 8px rgba(255,255,255,0.9);
+  }
+
+  /* Arrow layer */
+  .arrows-svg {
+    position: absolute; top: 0; left: 0; width: 400px; height: 580px;
+    pointer-events: none; z-index: 15; opacity: 0; transition: opacity 0.4s;
+  }
+  .arrows-svg.show { opacity: 1; }
+
+  /* Static cone / square layer — always visible, sits under the players */
+  .cones-svg {
+    position: absolute; top: 0; left: 0; width: 400px; height: 580px;
+    pointer-events: none; z-index: 4;
+  }
+
+  /* Legend */
+  .legend { display: flex; gap: 14px; margin-top: 10px; justify-content: center; flex-wrap: wrap; }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px; font-size: 11px; color: #bbb;
+    font-family: 'Barlow Condensed', sans-serif; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .legend-dot.blue { background: #1a6eb5; }
+  .legend-dot.cone { background: #f2d21a; border-radius: 2px; }
+
+  .step-indicators { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; justify-content: center; max-width: 360px; }
+  .step-dot { width: 7px; height: 7px; border-radius: 50%; background: #333; transition: background 0.3s; }
+  .step-dot.active { background: #C61D23; }
+  .step-dot.done   { background: #555; }
+
+  .desc {
+    font-size: 11px; color: #777; text-align: center; max-width: 340px;
+    margin-top: 6px; line-height: 1.5; min-height: 32px;
+  }
+
+  .controls { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .btn {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 18px;
+    border: none; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-primary            { background: #C61D23; color: #fff; }
+  .btn-primary:hover      { background: #e02228; }
+  .btn-secondary          { background: transparent; color: #888; border: 1px solid #333; }
+  .btn-secondary:hover    { border-color: #666; color: #ccc; }
+
+  /* TSI Logo */
+  .tsi-logo-wrap{display:flex;justify-content:center;padding:0 0 12px;width:100%;}
+  .tsi-logo{height:38px;width:auto;display:block;}
+</style>
+</head>
+<body>
+<div class="tsi-logo-wrap"><img class="tsi-logo" alt="TSI" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACWAZIDASIAAhEBAxEB/8QAHQABAAIDAQEBAQAAAAAAAAAAAAcIBQYJBAEDAv/EAFEQAAECBQEEBAgLBgQEAwkAAAECAwAEBQYRBwgSITETQVFhFBUWGCJxgZEJMlJVVnKSlaHR0yNCYoKisTNTk5QXJXODJKPBNDZDZHSys8Lw/8QAHAEBAAIDAQEBAAAAAAAAAAAAAAQFAwYHAgEI/8QANhEAAgECAgcHAgUEAwAAAAAAAAECAwQFEQYTITFBkdESFVJTcYGSUbEyM2HB4QcUIqFDYvD/2gAMAwEAAhEDEQA/AK06b+T9QcNKqtNl1zRJUw6rILnak4PPsjfPJK2vmaW96vziD2XFtOodbWpC0EKSpJwQRyIiarFuNFfpn7UpTPMAB9I/e7FjuP4H2RU39OpB6yDeXqdH0PvbK6j/AGdzSi5r8LcVtX03b1/teh+3klbXzNLe9X5w8kra+Zpb3q/OM5CK3XVPE+Zv3ddj5MPiuhg/JK2vmaW96vzh5JW18zS3vV+cZyENdU8T5juux8mHxXQwfklbXzNLe9X5w8kra+Zpb3q/OM5CGuqeJ8x3XY+TD4roYPyStr5mlver84eSVtfM0t71fnGchDXVPE+Y7rsfJh8V0MH5JW18zS3vV+cPJK2vmaW96vzjOQhrqnifMd12Pkw+K6GD8kra+Zpb3q/OHklbXzNLe9X5xnIQ11TxPmO67HyYfFdDB+SVtfM0t71fnDyStr5mlver84zkIa6p4nzHddj5MPiuhr05bVqyko9NP0iWDTKC4s5VyAz2xCsytLkw44htLaVKJCE8kgnkIlfVqqeCUFEghWHJxeFfUTxPvOB74iZtC3HEtoSVLUQEgcyT1RcYepdhzk88zl2mtS3jdxtreCj2VtySW18Nn0WXM/emSE3UpxEpJMqeeWeCU/3PYO+JJoWm8k02lysTC5h0ji0yrdQO7PM/hGdsi3WqBS0pUlKp10AzDnYfkjuH4mNgiJdX8pPs03kjZMA0OoUaSrXse1N8HuXtxf1z2fcwSLPtlCd0Udg/WUon+8ffJK2vmaW96vzjOQiFrqnifM2xYVYr/hh8V0MH5JW18zS3vV+cPJK2vmaW96vzjOQhrqnifM+912Pkw+K6GD8kra+Zpb3q/OHklbXzNLe9X5xnIQ11TxPmO67HyYfFdDB+SVtfM0t71fnDyStr5mlver84zkIa6p4nzHddj5MPiuhg/JK2vmaW96vzh5JW18zS3vV+cZyENdU8T5juux8mHxXQwfklbXzNLe9X5w8kra+Zpb3q/OM5Gm35eTdISuQpyku1AjClc0sevtV3dXXGSk61WXZi3zIOIU8Kw+g61elBJf8AWObf0WzeY69/JOgsmWl6PKPVBY9FGVENj5SuPuERoo5OcAeqP7fedfeW884pxxZKlKUckk9ZMfnF9QpaqOTebOOYtiKv6/bhTUIrckkueW9iEI91CkF1SsSsg3nL7gST2DrPsGYytpLNldTpyqzUILNt5L3JGsG06W7bbM3VJBuYfmCXElefRRySOB7s+2M/5JW18zS3vV+cZllttlpDTSQltCQlIHUAMCP7jWqlxUlJy7T5nebPA7K3oQpOlFtJJtxTbfF7jB+SVtfM0t71fnDyStr5mlver84zkI866p4nzJPddj5MPiuhg/JK2vmaW96vzh5JW18zS3vV+cZyPLVp1um0yZn3fisNleO0jkPacCCq1W8lJ8zxUw7D6cHOVGCS2v8AxXQh7URFNl7hckqXKNS7UukIXuZ9JfM8z1ZA9ka3GSnKfWHpE19+QmzJTDyk+GFlXRKczlSd/GN4ZHDOeIjGxstOPYios4Pe3CuLidWMUk22ktiS4IQhCPZFEIQgBCEIAQhCAEe+hVSao9Tan5VWFtnik8lp60nuMeCEfGlJZMyUqs6U1Ug8mtqZYGiVOVq9Man5RWW3BxSeaFdaT3iPdEKWHci6DUt14qVIvkB5I47vYsd4/ERNLSkutJdaIWhYCkqTxCgeREa7dW7oTy4Pcdv0dxuGLW3aeypHZJfuv0f8H9Qj7uq+SfdDdV8k+6IpsB8hA8OcIAQhCAEIQgBCABPIE+yPu6r5J90D6fIR93VfJPujF3VUfFFvzc9yWhG61nrWeCfx4+yPUYuTUVxMNetGhSlVnuim37ET6j1QVO6JjcVlmW/YN9no8z7TmPZpTS/DrjE24nLUknpOPLfPBP8A6n2RqCiVKJUckniTEy6Y0zxfa7Tq04dnD0yvq8kj3cfbF7dSVC37K9DkGj9GeMYzr6q2Jub57Fzy9kbTCEIoDsghCEAIQhACEIQAhHyPuD2H3QAhH5uvstf4rzTf1lgf3iPL+vf/ABKXRXu1L0yg+9KD/c+7tjNRoTrSyiVeKYvbYZRdWtL0XFs9d+3qmSDlMpDgVNcUuvpOQ13J7Vd/V6+UXLUpaipSipROSSeJj4cx8jYaFCNGOUTiuL4xcYrW1tZ7OC4Jf+3viIQhGYqhEhaOUzfmpqrOJ9FpPQtH+I8VH2DA9sR7G20G9pui0lqnSlPlSEEkrWVZUonJJ4j/APhEe6jOdNxhvZeaPXFra30a908ox2rZnt4dfYmKERUzf1zzjvRScjKuLPJLUupZ/uY2GlyOtVZI8V2XXHknktqiubv2inEVKw6t+h0aWnOGLd2n7fybpHyPJTNIdpKqkFu25iUQf3ph2VYx7FKz+EbTTNmjX2f3fDLiolNSefSTpUof6bZH4x7WGVfqiPLT6wW6nPkupgY0PWGp9DTZalNqwuYV0rg/gTy95/tFgabskX48QavqwiXH7wlZRxz8VLRFSL8Sw1d9TlJSsTFZlJWZcl5edfGFPtoUQF4ycA4JAzyMZ7fD3TqKUnuKbGdNKd7Zzt6EHFy2ZvLdx57ixfwfV6sS111bTmr9G9T66yZiWZeAUgzDafTTungd5sEn/piLD6h7MWk139K+3Q1UCdXk+EUhQZGe9ogtn2JB74p7sV2fN3VrvSJppTrUpQyanMuIJB9DghGf4llII6070dKyQkcTwHOLQ58UI1D2NL4pHSTNoVaQuKXGSlhz/wALM+rCiUH7Q9UV8u+z7ptCe8CuegVGkP5wkTUupAX3pUeCh3gmOluoevWllj9IzVrplZmdRwMlT/8AxL2ewhHBJ+sRFZ9V9sR6uyMxSLYsmneAujdU7XEJmisdvQD0AfWVQBU2EeipTa56ffnHGpdpbyysoYZS02nPUlCQAkdwEeeAEIQgBCEIAQhCAEepuoz7TaW252ZQhIwEpdUAPZmPLCPjSe89RnKG2LyPZ40qXzhN/wCsr84/pmoVV11DTc9OKWtQSkB5XEnkOceGNs0tpnh9zImFpyzJp6ZXZvckj38fZGOq404OTW4n2FOve3MLeMnnJpb+b9ltJYo8oqRpctJrcU4tpsJWtSiSpXWcnvzHrhCNYbbebO/06cacFCO5LIQhCPh7EfytSUIUtaglKQSonqA5mP6jWNTKn4utd5tCsPTZ6BHqPFR93D2xkpwdSaiuJEvruNnbTuJ7opv+PcjCvV+fn6xNTbU5MtNuOEoQl1QCU8gMA9mI8XjSpfOE3/rK/OPHCNmUIpZJH5/q3darNzlJ5t57/qezxpUvnCb/ANZX5x+b87OTCOjfm33UZzurcKhn2mPPH3Bj12V9DG61RrJyfM99u09VVrcpT08A84Ao9ieaj7gYn1CUoQlCEhKEgJSB1AchEMafs3AireF0G3p2sPhCkJQxLOO4J4Z9AExLVL0+2hrg3fALEm5BK+SpllEtgdv7ZQP4RX3ltVrzXZ3I3XRfHMPwm3m62bnJ8FwW7fl+p74+LIQMrISO1RxGcpey/rpWMKq1y0mlNn4yTPLWoexpGPxj3Tmyxa1DBe1C1upsiRxU2pLbZ9inXcn7MR44XLjIuK39QaK/Kot+rS+2Zo0zWqPLf+0VSSbPYX059wMY2ZvW2WOHjIOnsaaUr/0jd37W2QLY4T163Hc0wn4zcqVFKvUW20p/rjHv6obNVCBTbGiEzV1o4JXVprAV3kKU7/aM8cMpre2VVbT+8l+XSivXN/ujRpjUihoyGZede791KR+Jj9JK6rgqxxQrIq1QJ5dE045n2IQY2WY2np2RTuWdpfYVupHxVIp4ccT7RuD8I/hOre03e5CKI/cbjKuCU0ekBtKR9dDeR9qMsbCguBW1dM8WqbpqPol++Z8kLU13q+PF+l9RlwrkZmVU1+LqkiPs7p/q5KnduCu2Xa3DJ8YVyTbKfYFKMfsjRXaYvYlyuJrZac4ldYreB9grKh9mNkoGxPekyEqrl20Kng8xLNOzKh7wgfjGZWtFboorqukOKVfxV5ezy+2RHU5QZSVUU17X22kHrRSm5ycPsLbKU/1Rg51nTVheJrUG9K2f/laMhlB/mdmCf6YtJQNiezGCk1y7q7UCOYlm2pZJ94WfxiQKDst6LUrCl2s5UXB+/Ozzzn9IUE/hGRU4x3Ir6l5cVfzKjfq2ygc1Pabsu5lbfuee/inKwy0PsoYJ/qj+5JpdYWBbemipzs3BOTSv6VAfhHTeg6aae0IJ8UWTb0mpPJbVOaC/tFOfxjam20NoCG0hCU8AlIwBHsjHH+qzs01MOSr1Kk5B1s7q2vAwlaD2HfyoGMUtRUoqOMnsGI6u6r6T2RqZS1ytzUdpyZ3N1mfZARNMHqKXMZI/hVlJ6xHOnX/SOu6SXb4qqKvC6bNBTlOqCEbqJhAPEEfurTkbyerIIyCDAEbwhCAJU2V9P2dRtZKVR6hLeEUmVCp2ooOQFMt49E46lLKE+pRjobRdItL6PgyFgW00sclmnNrV9pQJiE/g8bH8Uad1G9ZtnEzXZjopZRHESzJIyPrOFf2BFo4A80hT5GQa6KRk5eVR8llpKB7gBHpxCEAMDshCEARbtU3v5B6J12qMPdHPzbfgEiQcHpngU7w70p31/wAscujzi1PwiV8eM76pVjSj2ZejMeEzaQeBmHgN0H6rYSf+4YqrAEy6I65vaRWhU5K2ralJqvVR8LmKjOuEtobQnDaEtpwTgqWokqHFXLhGt6haz6l32XG7huueclF85OXV0EvjsLaMBX82TEfQgD7mPkZ2zLSuC765J0eg052amZx9LDR+K2Fn5Sz6KeAJ4nqizMpsQ3EuWSqavqlNPEekhuScWkHs3ioZ90AVJhFk7s2N9TaWyp+iz1ErqQODTT6mHT6g4An+qIFu61rjtGqqpVzUWepM4nj0U0yUFQ7Uk8FDvGRAGGhCEAIQhACEIQAhCEAImPSymeAW0mZWnDs6rpT27g4JH9z7YiWmS6JqoMS7ryGW3HAlbi1YCE54kn1RLc3fFtU5pLEs85NBtIQhDDfAADAGTgRX3/blFU4LPM3TQ3+1t607y5moqKyWb4vflx2L7m1wiOXNQqnPzIlKHRC68s4bSd51avUlMbbb+lW0Hee6uXt6o0yVcGekm92RQB24XhZ9gMQYYdWlv2G3XWnGG0dlPOb/AEWS/wB5fYykw+xLI35l5plPa4sJH4xhJ68rblCQqpIeV8lhJX+I4fjEm2xsV3JPLRMXhe8lKk8VNyTK5lZ7t9ZQAfYYlm1NkTSOjhCqnL1avup4nw2cKEZ+q0EcO4kxKhhkV+KRr1zp/cS2UKSj6tv7ZFPJ3UuRQSmSpkw8eourCB7hkx5nrY1L1JmZd2k2PWZlhtJDZl5Nzohk8SXFAJ7OvqjoI5IaJ6VsB12Vs22VIGQtxLLb6vUTlxR98aJeG15pPRukbpLlVuF4cB4JKltvPet0p4d4BiZStaVJ5xW01nENIsQxCDp1p/4vgkkupWy2dkbWCrbip6SpVDQriTPTyVKA+q0FmJOtvYhT6K7jv0n5TNPkP7LWr/8AWMBd+2vdk3vtWvalKpTZ4BycdXNOAdoA3Eg+wxD926+6u3NvpqF8VRhlfAsyKhKIx2YaCSR6yYkFIW1Rs1bPtlS6Zi7Ki46hI3ius1lMuk+xHR+6PE/qLsl2FlNHpNCqEy3y8X0fwpzh2OuDH9UUPm5qZm5hcxNPuvvLOVOOrK1H1k8Y/E8YAuncO2vSJRoy1pWC+ptPBtc7NJYSn/tthX/3CI0r+1rrFXnyxRjSqQXPRQmQkOlc97hXk+oRXgHBzHSDZA1Csu9bJZlabSqNRblp7KW6lJycq2x0mOHToCQMoV1/JJIPUSBVLxVtP6jjLrV9Tsu7yEw45KS6s9gUUIxGet3Y71Vqiw7WZyhUdKuKw/NKfd9zaSD9qOg2BCAKiW3sRUVsIVcd81CbP7yJCTQwB3byyv8AtEmW7sraMUgpU9b0zVnE8lz884v3pQUpPuib4QBrFu6e2LboT4js+g09SeS2JBtK/tYyffGzAAco+wgAAByEIQgBCEIAQhCAERvtI6ey2pGk9WohYSuostGbpi8ekiYQCUgdyhlB7ld0SRA8oA40KBCiCCCOoxkLYo87cNx06hU1vpJyoTTcqwntWtQSPZkxkNTZZmS1HuaTlwAzL1ebabA5BKXlgfgInb4Pux/H2qk1dk0zvSdvS+80SOBmXQUo9yA4e47sAXqsugSVq2lSrbpycSlNlG5ZrhgqCEgbx7yck95jLwhACEIQAjw3DVZKh0KfrVRdDUnISzkzMLP7qEJKlH3Ax7orft/Xx5O6SM2xKvbk7cUx0SgDgiWawtw+1XRp7wowBRK/bjnbuvOr3NUCTM1ObcmVjOdzeVkJHckYA7hGEhH0c4Az+n9nXDfd0Stt2zILnJ+YJIGcIbQPjLWo8EpHWT3DiSBHQfSPZk02sulyjlWo8tclbSkF+cn0dI1v9fRtH0EpB5ZBPaYxexNp/IWXZK5h+XQq4alLsTdQdIyphDqStmXHZhvdWodrg7BFhYA8iaZTk08U9EjLIlBjdYS0EoGCCMJAwMEAjsxGGum+rRtSpSkhc1fp9GcnUKXKqnX0tIe3SAoBSjjI3k5B+UO/GyHgI5ibWuoX/ELWSpzco/0lJph8X0/BylSGyd5wfXXvKz2bvZAHSuj1yi1lvpKRV6fUUc96VmUOj+kmMZf9o2re9FVb91UyUqEs+D0bbow4ggcVtq+MlQ7U4jkfLTL8s+l+WecZdT8VbailQ9oi53wel8VGtVi5bfrtQmalOIlWZmUfm3lOuoZSooW2FKJIQCpBCRwySYAhDaP0Hr2ks8zPdIKjb064Uy822D+xXxIZc/ixyVwCsHABBAhuOvt9WxSLztOo2zXZYTEhPslp1PWnrC0nqUk4UD1ECOUmpVp1Cxr6q9p1TjM02ZU0VgYDiOaHAOxSSlQ9cAa7CEIAQhCAEZC3aLVbircpRKJIPz9RnHA1Ly7KcqWo/wBh1kngACTwEY+L77EemlJsjTv/AIlXKZaWqVYZ6Rl+aUlCZSSPxfSVwBcxvE5+LuDtyBGFj7Ft51Do3rsuKmURonJZlkmaeA7D8VA9ijE5WVslaS0ENu1KTqFxTCeJVUJkhvPc23ujHccx6NQtqrSi1ulYkKk/cs6jh0VLb3mwe95WEY70lUQfWNqHWPUCdcpmmdoeAhRIBlJRU/MpzyJUU7ifse2ALj0ehWhZlMWaVSqNQJJtPprYYbl0AdqlAD3kxHd8bS2kFqlbarmRWJpGR0FJbMyTj+MYb/qit0vs87QWpk0iev6uqkmlHe/5vUFPrSP4WW95KfV6MSlZWxfY1OCHbor1WrzwA3m2cSjB7eA3l/1CANJvbbZqbpWzZtnS0qMYRMVR8uqPf0be6Af5jGjLuPal1byJDyoVIvcAJFnxfK4PV0g3AoetRi7tmaUacWeEm3bNo8m6jGHzLhx7/UXlf4xuZxiAOU+sWmN1abTVObvCZkfGdTbXMeDNTXTvNoBA3nFYxxOQME/FMaBEmbTl7+X2tFerTLvSSDL3gUgQcjoGspSR3KO8v+aIzgBCEIAQhCAEZC3a3VrdrMtWKHUZmnVCWXvszEu4ULQfWOo8iORHAxj4QBbvTbbTqsnKtSd+22mpqQMGfpy0tOq71NK9An6pSO6JQY2yNJnGkqXKXM0ojilUi2SPc5iKfaEaNXTq5WJiWo3RSdPlE5mqhMpUWm1EeigY4qWewchknqzNHmR3V9NqL/tnYAlzzxtJP8q5Pu9P6kPPG0k/yrk+70/qREfmR3V9NqL/ALZ2HmR3V9NqL/tnYAlzzxtJP8q5Pu9P6kPPG0k/yrk+70/qREfmR3V9NqL/ALZ2HmR3V9NqL/tnYAlzzxtJP8q5Pu9P6kPPF0k/yrk+70/qREfmR3V9NqL/ALZ2Mla2xXV5O5abN1q7KVN0xiabcm5dqWcCnmkqBUgE8BkDGe+ALjW/U2q1QpCrsMTEu1Oy7cwhqYRuOoStIUApOThWDxHVHuj4lISkJAAA5AdUfYAQhCAEYu7q5JW1a9UuCorCZSnSjk06c49FCSrA7zjHtjKRWP4Qm+PEmmclZ0q9uzdfmN58A8RLMkKV6t5ZbHeAqAKHVeeeqdWm6jMnL00+t9w/xLUVH8SY6UbG9keRWhtJ8IZ6OoVj/mc1kcR0gHRp9jYRw7SYoNoLZa9QNWaBbBQVS0xNBycI/dl2/Td49WUpIHeRHVxpCGmkttoShCQAlIGAAOQgD+oQhACEIQAMc09tK9/LLXGpsyz3SU+hjxZLYPAqQSXVe1wqGexIi/GuF5t2BpXX7pUpIflJVQlUq/emF+g0MdfpqGe4GOT8w64++t55xTjjiipa1HJUSckk+uAPzgIQgCwGzvtEVy0NSpqdu6een6HXHEJqORnwZSUhDbzaRyCEhKSkc0AdaUx0GodfolcaLtFqslUmwASuVfS6kZ5cUkj2Rx8YbW68hptJUtZCUgdZPAR18sahy9tWdR7flWkNNU+SZlglCQB6CACeHWSCSe+ANf1Gkr/uGh1CjWw/SqAmZl3GfGE2pbzw3kkZQ23gIPH4xUSOe6cRy9vy0q9ZFzzduXJILkqhKqwpCuKVp6loPJSSOII5x17iMtoHRy3tW7YMnPBMnWJZJNOqSUZWyo/uq+U2TzT7RgwBy0icNiCvMUHaBpRm5luVlp+WfknHHFbqcqTvIBPVlaUAd5A643vRPZCqdwobrN81hNOpnSLCJSR9KYfCVlOSpQ3W0nBI4KOOoRcCw9NrIseiKpFtW5Iycu4ndfJb6RyY/wCotWVL9px2AQBtsUT+EdttqRv23bnZb3TVJBcu8QPjLYUME9+66kfyiLt16oii0pyfMm/MsS43nUS6d5xLYHFSU81YHHdHEjOATwPPXbB1tpuq1ckKZb8kU0WjLdLE48Cl2aWvdClBP7qMJGAeJ5nHIAQFCEIAQhCAETFpJRbx1+1Gp9q126Kkunysqp11ajvtybDaQlIbayEJyShIwBzzxxEOxfT4PCx/FOntSvWbZxM1yY6GWURxEsySMj6zhX9gQBu1ibLmkdrht1+iO3BNox+2qzvSpz/0wA370mJkplOkKXJok6bJS0lLI4IZl2ktoT6kpAAj1QgBCEIARFu1Re/kHonXaoy90c/Nt+ASJBwemeBTvDvSnfX/ACxKUUR+ESvjxnfNKsaUezL0ZjwmbSDwMw8Bug96WwD/ANwwBVY84+QhACEIQAhCEAIkTQbSivasXiij0xKpeQY3XKjPqRlEs0T+KzghKes9gBIx+jum9w6n3ixbtAZxnC5ubWklqVazxcX/AGA5k8B3dN9J9P7e01s6Vtq3pfcZa9N99YHSzLpHpOLPWo+4DAHAQB7dPrPoNiWpJ21bkkmVkJVOAOa3FH4ziz+8tR4k/wBgAI2CEIAQhCAEIQgBCEIAQhCAEIQgAeUcx9r69/LjXGsPy73SU+lnxZJ4OQUtEhah9ZwrOezEXz2jdQGNONJqxXunS3UHGjK01OeK5lwEIx27vFZ7kmOWcszMT083LsIW/MPuBCEjipa1HAHeSTAFzfg5LH6KSr2oM2z6TyhTJFRH7owt5Q7iejTn+FUXEjUtHbPYsLTKg2oyE70hKJS+pPJbyvSdV7VqUY22AEIQgBCEfnMvNS8u4++4ltptJWtajgJSBkknuEAU2+EcvjKqDp9KPcs1OeAPrQyk/wDmKx9UxTSNy1svJ2/tUq/dS1KLU7Nq8GSr9xhPoNJ+wlPtzGmwAhCEAbfo7QZ64tSKJISMm5OFE23MvtNkFZYbUFulKSQVkICjujJOOAMdZpdxt5hDzSwttYCkqHIg8QY48UGrVGhVmTrFJm3JOfknkvy77ZwptaTkER0c0F1+o2otnpeclyi4pBrNUpkuN51SRzfYRzcR1lIypPLB9HeAm6EajO6m6eyVEarU3elBYkHkb7Tq55sb47AnO8TngRjIPDGYgfWTa4siXok9SLIXUKrUH0FpM8hjomGgSApQK8KUoJzjCQM44wBaRpttpsNtIShA5BIwBH9RqmmWoVpaiUBNYtSqtTjIADzJ9F6XV8lxHNJ/A9RIja4A1bV2qIomlt01Za93wSkTTqT/ABBpW6PfiOSJ5x0e22q1NymiNbpzLstIS80G2nZqaWUl476VCXYSAStat3iThKUhWT2c4TzgD5CEIAQhCAMjbNHnbguGnUOmt9JOVCZblmE9q1qCR+JjrfZNvyVqWjSbbpyQJWmyjcs2cYKghIG8e8nJPeY5MWVc1Xs655O5KC+0xUpJRVLuuModCFFJTndWCCcE4yOHOJV86vW/6WMfdct+nAHSqEc1fOr1v+ljH3XLfpw86vW/6WMfdct+nAHSqEc1fOr1v+ljH3XLfpw86vW/6WMfdct+nAHRy4KrJUOhz9ZqLoak5GXcmX1n91CElSj7gY5I39cc5d96Vi56gT4RU5tyZUnOdwKVkJHckYSO4Rvd5bQ+rV3WzO25XLmQ/TZ5AbmG25FhorTkHG8lAIBwM4PEcIiiAEIQgBCEIARs2mVj1/UK75S2bclenm5g5WtWQ2w2PjOOHqSPx4AZJAjWY3zTDVu99NpabYs6flKf4YsKmHDIMuuOYHAFa0k7o44HLJJgDpFolpjb+ldms0CioDr68OT06tIDk27jipXYkckp5Ad5JO9RzV86vW/6WMfdct+nDzq9b/pYx91y36cAdKoRzV86vW/6WMfdct+nDzq9b/pYx91y36cAdKoRzV86vW/6WMfdct+nDzq9b/pYx91y36cAdKoRzV86vW/6WMfdct+nDzq9b/pYx91y36cAdKoRzV86vW/6WMfdct+nDzq9b/pYx91y36cAdKoRzV86vW/6WMfdct+nDzq9b/pYx91y36cAdKsjtjVNS9RLR06oiqrddYZkkYPQsZ3n5g/Jbb5qP4DrIEc8qvtMa2VNgsO3s+wgjB8FlGGVfaSgEewxFlaq1UrVQcqFYqM3UJx3/EfmnlOuK9alEmAJD2iNYqzq7dgnplCpKjye8imyG9kNJPNajyLisDJ6sADgOOy7ENkeV2t8jPzLO/T6Ag1F7I4FxJwyn175CvUgxBUb3pdq1fOmjE8zZtUYp4n1IVMlUk06pe4CEjK0kgDePAdpgDq7COavnV63/Sxj7rlv04edXrf9LGPuuW/TgDpVCOavnV63/Sxj7rlv04edXrf9LGPuuW/TgDpVEIba18eR2h1RlpZ7o6hXVeLJfB4hCwS6r1dGFDPaoRUTzq9b/pYx91y36caPqjqnfGpjkgq8qwKh4AFiWSmXbZSjfxvHCAASd1PE9kAaSecIQgBCEIAR7KLVKjRarLVWkT0xIz0ssOMTDDhQ42odYI4iPHCAM1ety1K7rjmbhq4lfGM3umZcl2EtB5YSElwpTw31YyogDKiT1xhYQgDbNJpu65W+qf5G13xJVXF7iZxc2mXabRzUXVKO70YAyQcg45E8IvU/rtZWn9vOzFz6qMX1XUt4EtR5dpLal/JSGxup481LWe4dUc6Y+5gCQtc9W7l1ZucVStLEvJS+UyFPaUS1LIPP6yzgbyjxOOoAAR5CEAIQhACEImPQvZ8uvVu3Z2u0WqUmQlZWb8EPhpcBWsISo7u4k8AFCAIchFpPMn1B+lNrfbmP0407WPZqunTCyHrqrdw0GZlm3m2Usyyni4tSzgAbyAOAyefIGAIMhFj7Q2Qb+uS1aVcDNet2UaqUm1NtsvreDiEuJCkhWGyM4I5GMPp9sxXfes/cktS69QW26BVXKU8+6t3ceeQPT3MIJwMjnjnAEEQiT9YdF6/ppdlFtio1Sl1Ko1dAWwiSU4QkKc6NO9vJHNWeXYYlXzJ9QvpRa325j9OAKtwiw2oWyheVk2XVbrqtzW25J02XL7iGlvb68YASnLYGSSAMnrivJ5wAhGesO0Livi5GLetemO1CoP5IbRgBCRzWtR4JSMjJJxxHbFi6PsUXs/KJcql10GSeUMlppDr273FWEj3ZgCq0ImrWvZuvrTChruGbep9XorakpemZJSt5gqOElxCgCASQMjIyRnGY1fRzR299VZx9u2JBpMpLKCZifml9HLtKPJO9glSscd1IJxxOIAj2EWwGxHdng28b0ofT4+J4O9uZ+tz/AAiBtYNL7r0suJujXPLsgvtl2VmZdzfZmEA4JSSAcg8wQCMjhxEAaRCJp0e2a9RNR6QzXJZuSo9He4szVQWpJfHym0JBUR3nAPUTEg1XYnvRmSW5TrtoM3MJTkNONushXcFYV+IgCqsIztbtG46Peb1nT1JmU11qZEqZJCd9anDjdCd3O9vZBBHMEERPlpbGeolUp7c3W6vRaGtwA+DLUt91HcrcG6D6lGAKzQiw2qGyZqBZtuTdfkp6mV+Tk21OzDcrvofQhIypQQoYUAMk4OeHIxp+g+hdz6vy9WmaHUaXIM0xbSHFzqnAHFLCjhO4lXIJ457RAEUwi0nmTahfSi1vtzH6cRjdOhtx0HWSj6XKq1JnKvVEtKS9LqcLLIWVfHJSFcEoKjgHgRAEUwi0nmT6hY/96LW+3Mfpxp2pey1qdZFCmq6tumVqQlGy7MLpr6lLabAypZQtKSQBxO7nA48hAEGQhHvt6lTVcr9PoskEman5puVZCuW+4sJTn2mAPBCLL13Y5vmjUSeq87dVrplpGWcmXiFv5CEJKlf/AA+wGND0I0GujV2m1OoUSpUuQYp7yGVKnS4OkUpJVhO4k8hjOe0QBEkImm4tnG86Lq5QNOHahSn56uS65iXm2i54OhKAsrCiU72QEZ4A/GEZfU3ZYu6wLFqd3Ve5bddk6c2la22VPdIsqWlCUpygDJKhzMAV/hEmaN6IX5qoXH7dkmGKay50btRnXC2wlfAlIIBUtWDySDjhnGYmU7Ed2eDbwvShl/HxDLvbufrc/wAIAqdCN31X0tu7TS6mbeuOTaL8ykLlHpZfSNTKSd3KDgHnwIIBHDhxETYjYo1CUhKjc9rpJGSCt/h3f4cAVchFpPMn1B+lNrfbmP04jleglynXIaSMVikPVYS/hD00lTng7Kei6TCju72cbo5c1CAIhhE8atbMV2abWNO3bWrit+YlZVTaOhllPF1xS1hACd5AHXnieQMejTLZVve+7Fpl2yNcoMlLVFtTjTM0p4OJSFqSCd1BHHdyOPIiAK/wi0nmT6g/Sm1vtzH6cRzrJoHcumU/b1PqdYo9RnK/Mql5RmSU4VAgoGVbyRwy4kcIAiGEWdqOxlfUhT5mfmbrtZDEs0t1xW/McEpBJP8Ah9gMYHTDZXva/bFpt3SNboUjK1FCltMzSng4EhakgndQRx3cjjyIgCAIRLUhoTcc/rjN6TSlXpLtTk2i6/OAueDIAaS4Rnd3s+mlPLmYkrzJ9QfpTa325j9OAKtwi0T2xXfrLK3nbrtVDaElSlFcxgADJP8AhxHuh2gF06t0ipVWhVWkScrITQlSucLg6VW7vHd3UHgAU88cxAEPwi0nmTahfSi1vtzH6cQZrBYM/ppe8xaVUqMjPTks0246uTKyhO+neCfSAOcEHl1wBp0IQgBFh9lLWO+qNW7c0xt6Uoop1Rq6encelVre3XFDpFbwWBkISccOoRXiLB7AtA8b69s1JTe83Rqe/N5PIKUAyn2/tCfZAF8dTrkFo6dXBc4CCum056ZaSseipaUEoSfWrdHtjnnf2tOoGtwotj1xuktMP1VktJkpZTalOqy0nJK1ZA6Q8Itnt6V/xNoBOSCHNxysT0vJADmUhRdV+DWPbFRNjmg+P9oe2ULRvMyLq59045dCgqSft7kAdLpKUbp9KZkpJtIblmUtMoJwMJThI/ARoWzvY9WsLTw024HpR6tTlQmqhPrlVlbanXXCeBIBPohPVzj06/X1N6daX1C5abKy85Um3GGJOXfBKHXXHUoAO6QeRUeB6o3WWdebprbtQLSHktBUwUcEBQGVYz1ZzAFM7zHl98IPSqYB00rQ3mEkniAJZozCv/MJEW9vI3ELXnzaaaequdCfAhPlQl+kyOK93jjGTwiomxE2u8doC/dQn0qcTuuqQT+6uafKh7kNqHqMWi1VndRZOkyitOKRRKlUFP4mE1V9TbaGt08RukEq3sdfLMAVJ2uL01to1nMWfqE7ZYk6+SoJoyXi7usLbX6RWcAFRT1HODFTonTbLqWok9flJb1HkqHIT7VMBl5alPKcbDSnV+mreJIUSCPUkRBg4nEAXc+DZo8ki27rr/7JU67OMyfH46G0I3/YFKX7dzuiw17+X0vd1DqlvFqbt2VamPGtLa6JM1OLKcNbincJASeJ9NJPfFftlfQmoSVjUS/qPqDcNvVWryvTPMSjbK2FtlaujCkOJIX6OD6Q4EnGIsFp5O3y7Xripl1U9kUynustUmp7iW3Kgkoy6tTaVFKQFYAxjOeXCAK47WOvkrOaf1vTqYsy6rfrc+lpP/NJZpCOiDqVKUlSXFbwISQCnI7+ETxsx2y1amhVq05DCWn3pBE5M8OKnXh0iirtI3gPUkDqiD9v8yNbunTizkBoT05OrK3OG+006400PYpW8f5Ite62uTpC2qbLpWthgpl2d4JBKU4QnJ4DkBAEe6JXnW70uC/pmbcZVRaXX10qlBDIScMpw4oq/eySk90QRt1NIuzWHTSwGRl+YWd8p5hMw+22PVwaUYnnZps2r2PpLIUq4mktVx9+YnKilLiVjpnXVK+MkkE7u6OBiAqdNy19/CGLfS8h6St9tbbeDkFUuwUkD1POKPsgC1Nz1CSs2wKlU2WWmJOi0x15toDCEoZaJSkDswkDEVksPbNt2VtKRYvKl12eryUq8MfkpRhDCiVqKQkFwHATujlxIMTttHUG5bo0crlt2lKomKpUktSyQt5LYS2XU9ISVED4gVw58YgW5djqx6FbVSrc5eVe6Knybs06eiZA3W0FR6u6APHs2VCT1b2t7q1NEm8iRkpILkUTCRvtKUlDDeQCQFbiXORPOJk2rdVpzSu27enacpCXp+sNtTGWUuK8FQkqe3EqIG9jdAyeuI6+Deozcvp3clfwnpZ2qplT27rLQUPxeVG4bRWjlX1g1GtySnn35C06ZTphx2cYcbLhmnFpAbCFcfioSd7GOYzmANGvTbIsapWhWadSKDcrdRmpF9iVW80yG0OrQUpUohwnAJB4Axt+wDQPFOgzdTWjDlZqL81vEcShGGU+z9mo+2K+7UOz/aukVlSNYp1xVWfn52fTLNMTCGgndCFKWr0RnhhI/mi7Gi1A8l9JbWoJRuOSlLYQ6MY/aFAUv+pSoA13VBWuouPOngsdFETLo3jWC90xdyd8+hwCcYx6jFadlaqVvVPaynr7uLwNybp1OcdUqVQUsJUEJlkBAJJAKVKPE9piaNUK9tEy9OudcnbVky9AaZmy1NuTrnhCJYJXhw+njfCOPLGY0T4NqgdFbd13OtvjNTbMi0o9QaQVqx7XU+6AJ410u64bUolERask1N1ar1uVpraXZdbqG0OE761BJGAAOZOBmMvrBWpa3dLLnrU2UBuVpcwsBfJaujISn2qKR7Y9Ll40ZGo7dhEzHjhylKqowgdGGA6G+Ks5Ct7qxyHOK/fCMt1NvTCizUtWJpiRXVBLzUgggNTBLa1oWrhklJbOBnHHOMgGAKFnnEwbG1B8f7Q9tIWjeZkHHJ93hy6JBUk/b3Ih6Lb/AAbVA6e67quZbfCUkmpJtRHW6srVj2ND3wBYTbBr3k/s83Q4hZS9OsIkGxn4xeWEKH2Cs+yMFsIUDxNs/SE6pvccrE7MTyuHHG90Sf6WgfbGkfCQV4sWda1stLO/PT7k4tKeZDKN1Of5nfwixml1CTa+m9uW/u7hp9Ml2HPrpbG+ftZMAfpV7TkKlfVCu144nKNLzbDIxzD4bBOe7cP2jEFfCH1/xdo7T6I2rDtWqqApOfjNNJUs/wBXRxPGn900+9LPp9zUvPgk8hSm8nJG6tSSPekxUnbkU5eeu9hacy7yhvIbSop49GuafCCcdoS2D7YAsvs80aToOiNn06RLSm/FLD6lt/FW46kOLV35UsmMa9XdRrQnbkqFwUCo3dTHZ9TlJZoCGFOSkoE+ihaFqbWtec5xv9x6owVm6TXPpba801aGoNwVSXk2HXpWizstLvNOuBJUltBICm95XD0VJHHMSjY05XqhZ1LnropjNMrT8slyck2l7yWXDzSDk8uHWePWYAoDtQa4SV/6gWxV6DR56TRbZKvBqswlJVMdKlSkqQlR9H9mgEEg8xwi0Wx9qjemqtCr1YupmltS8pNNy0p4FLqbyvcKnN7eUrPBTeOXMxSzaoqcjV9oO8ZunJaSwKh0GWsbqltIS2tXDmSpKjnri7exBQfEezxRnlo3Hao8/UHBj5SylB+whEAa9th663LpTVrfpVqs0t2ZnZd6Ym/DWVObqApKW90BScZIc7eQjRNh6cquoOtd76n15DKp4ybTCy0gpbSt1QwEgk4whjHM8DETbc9e8d7QtVlkLK2qTLMSCDnhkI6RY+04oeyLJfB6UDxbotN1laMOVeqOuJVjm20lLaf6g574Aw/wj9f8E09t23EObq6jUlTKwDxKGW8e7edT7owWxZrHfV2XZStPXJOis29R6OoqLEqtL3RtJS2jKisjJUpJJxx4xovwh9f8Y6xyFEbVluk0psKTnk66pSz/AE9HG7fBr0Dhd1zuI/yJBlWPrOOD/wDHAE8bUeo9R0v0pfuKjolF1NycZlZVM0grbKlElWUggn0Er6+eIqZplfN069bS9hu3U1TwmjuqmEolGS22lLQLxJClKySpCB7o3/4Siv4lbRtdtWd9b8+8nPLAS22f6nI1X4OGjNTWpNw1tzBVIUtLLYPUp5wcfc2R7YAtFtT11VvaA3bNtrKX5iS8CaCeZW+oNcO/CyfZG2aa0NFr6dW/b+6EeLqaxLr+slsBR9+TGo7QdoV++GLQolLlEO0tu45adrLinUp3JVrKiME5VkkcBnlGb12uRq0dH7pry3g04xTXksEnH7ZaShsesrUmAOfUjrVcNp623bf9ts02YmqxMzKEqnWVOpQwp4KASApODhCB6hHRLSWrVuvaZW9XLiRLoqlRp7U2+lhsoQkuDfACSSRhJT1xyitmlvVy5KZRZfPTT821Kt4+U4sIH9464z78lbFpvzO6G5KkyKnMdSW2myf7JgClWvu0/fMpe14WXQ26KKM09MUxDqpZanwAktrUF7+M729g44cInrYdoHiPZ5o7y0bjtVffn3B9Ze4g/YbSfbHOOoTU1V6zMTj2XZqdfU6rHEqWtRJ/Ex1v0/oibasWhW82kAU2nsSvDrKG0pJ94JgDQNUpnXmVr87NWSqwmrcYYStK6sX+n4Iy4VbnogZzjuEc4tQ7sqt83nUrrrfQeMKg4FuhhBS2MJCQEgkkABIHOLy6x1/aJbsa7jN23ZEjQfAJsOTKJ1wzDcsUKG8PTwXNzlw59Uc+zACEIQAiVdnzWWoaQTNXmqZQJCqP1JDTalzLq0lpKCo4Tu9pUM5+SIQgD2bQWvFe1fp9JkanR5GlsU51x4JlnFr6VSgEgne7ADj6xjB6CapTmk10zdw06iyVUmpiTMoBMuKSG0qWlRI3es7gEIQBvup+09cN+S9Claja9Ll5Wl1hiqKaafcImVNZ3W155JOeOOMbBcm2Rd1Xt2pUkWnR5Uzso7L9O3MOlTW+gp3gD1jORCEAaFs/681XSGjVOQpVt06orqEwl51+YdWlQCU7qU4TwwMqP8xiTfPZu76FUP8A3LsIQBAmtmotT1Qvt66qpJsSTq2GmES7KlKQ2hAxgFXHiST7Y0iEIAn7RTaivLTq2WLZepchXqTKAiVS+tTTzKSSdwOJyCnJOAUkjlnGBG7VrbbuZ+ScRR7HpUjMEEB2ZnHJhKT27oSjPvhCAK2XnelzXfdrt1V+qvzVWcWlQfzu9Hun0QgDggJ6gOXrixNo7ad4U6lMytwWrTK1MNpCTNNzCpVbmP3lAJUnJ68ADuhCAMbqDti39XqS7T7fpVPtpL6SlUy04p+YSDwO4pQASe/dyOoiIIsK8q/ZF4yd10Cc6Kpyq1KC3BvpcCgQpKwfjBQJB9eefGEIAs1I7b1dblUpnrApz8xjitmorbQT9UoUR74jHWvaUvzUqkOUF1EnRKK7jppWS3ip8A5AccUckZ/dAAPWDCEAYjQTXS7dI1zctSGZSo0udcDr8jNhW7vgY30KScpVgAHmCAMjgImaa2362uWKZTT+ntTGOC3aktxGfqhCT+MIQBAGpWq116jXdKV+7n2pxEm4DLyDaS3LNI3gVISkEkb2OKiSo8OPAROo22LtAwLJoYH/ANS7CEAYHULa2uu7rIrFsOWvSZFuqSq5Vx9l9xS0IWMKwDw4jI9sYfRXaVrWl9iMWrSrUpU40h919cw8+4lbi1qzkgcOAAHqEIQB9kdpq45bWSoakqtymPTk1SUUtEop5zo2W0rSvIPMkqST7THg182hq7q1acpb9Tt6nU1mWnkzgdl3nFKUoIWjdwrhj0yfZCEAQjE2aB7QNW0jtidotKtmm1Azk4Zp2YmHnEr+IlIThPDA3Sf5jCEAYnWLWiral35QrmrFFkWEUhDaUSLTiy26Eu9IreJ4je4JOOoRKVX2z7wnqTOSSLRo0uqYYW0l5Ew6VNlSSN4Z6xnMIQBqeim01c2mdhsWlJ0Cm1OVl3nXGXZh5xKkhat4pwnhjeKj7YjzUzUyvXpqm5qCoIpdTDjDksmWUSJZTKUhBSVcc5TvesmEIAne3dti6pSnNM1yzaXVJhKcKfYmly2/3lO6sZ9WB3CMHqJtg6gXDSnadQKbIWy2+kpVMMLU9MpB4HdWrASe8JyOoiEIAratSlrK1qKlKOSSckmLN2fte3HbNqUm3ZCyqKZWmSbUo0VTDuVJbQEgnvOM+2EIAr1etwTd1XhV7ln0pRM1Oddm3EJJKUFairdGeOBnA7hE7aY7VVfsOwqTaNNs+jvStOZLaXXH3QpwlRUpRA4ZJUTCEAQxqpeU/f8Af1Vu6pMNS8zUXErU02olLYShKEpBPHACREnaF7RlY0pstdtUm1qXOtuTbk04++84la1qCU8k8OASBCEAaVrvqjVtWbxZuKrSMvILYk0SjbDC1KQlKVKVnKuOSVn8I82jep1zaWXSa7bTjClOt9DMy0ygqZmG8g7qgCCCCMgggj1EgoQBYdO2/WRLhC9PZAv4+OKmsJz9Xo8/jEKa366XvquWpStvS8lSWHOkap0kkpa38YC1kkqWrBPEnAycAZMIQBpmnFyrs6+aRdDcgxPu0yZTMtsPKKULWnO7kjjwOD7InXUDa3uu7bJrFsOWvSZFupyi5Vx9l90rQhYwrAPDiMj2whAFe7aqQo9x02rqlG5sSU21MGXcJCHdxYVuEjjg4wcRaHz2bu+hVD/3LsIQBrGqm1ZdN92DVbSftqlU9mpNpacmGHnFLSkLSogA8OO7j1ExXQ84QgBCEIA//9k="/></div>
+
+<div class="header">
+  <h1>Passing Square</h1>
+  <p>Passing &amp; Receiving</p>
+</div>
+
+<div class="phase-label" id="phaseLabel">Team Set</div>
+
+<div class="scene">
+  <div class="field"></div>
+
+  <!-- Static cones + square outline -->
+  <svg class="cones-svg" viewBox="0 0 400 580">
+    <polygon points="94.4,186 305.6,186 305.6,394 94.4,394"
+             fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.4" stroke-dasharray="6,4"/>
+    <!-- Yellow cone at every corner -->
+    <g fill="#f2d21a" stroke="rgba(0,0,0,0.55)" stroke-width="0.8">
+      <circle cx="94.4"  cy="186" r="5"/>
+      <circle cx="305.6" cy="186" r="5"/>
+      <circle cx="305.6" cy="394" r="5"/>
+      <circle cx="94.4"  cy="394" r="5"/>
+    </g>
+  </svg>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="grid-label" style="left:50px; top:528px;">20 × 20</div>
+
+  <!-- Pass arrow -->
+  <svg class="arrows-svg" id="svgPass" viewBox="0 0 400 580">
+    <defs>
+      <marker id="mPB" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+        <path d="M0,0 L7,3.5 L0,7 Z" fill="#1a6eb5"/>
+      </marker>
+    </defs>
+    <path id="pass" stroke="#1a6eb5" stroke-width="2.6" fill="none" marker-end="url(#mPB)"/>
+  </svg>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot blue"></div>Blue — 5 players</div>
+  <div class="legend-item"><div class="legend-dot cone"></div>Cone</div>
+</div>
+
+<div class="step-indicators" id="stepDots"></div>
+<div class="desc" id="desc"></div>
+
+<div class="controls">
+  <button class="btn btn-secondary" id="prevBtn" onclick="changePhase(-1)">← Back</button>
+  <button class="btn btn-primary"   id="playBtn" onclick="toggleAuto()">▶ Auto</button>
+  <button class="btn btn-secondary" id="nextBtn" onclick="changePhase(1)">Next →</button>
+</div>
+
+<script>
+// ── Geometry ─────────────────────────────────────────────────────────
+// Field in scene: left 40, top 30, w 320, h 520  (scene 400 × 580)
+const FL=40, FT=30, FW=320, FH=520;
+
+function p(px,py){ return [ FL + px/100*FW - 12,   FT + py/100*FH - 12   ]; }
+function b(px,py){ return [ FL + px/100*FW - 6.5,  FT + py/100*FH - 6.5  ]; }
+function ctr(pos){ return [ pos[0]+12, pos[1]+12 ]; }
+
+// ── Cones (drawn in the static SVG above) ─────────────────────────────
+// 20 × 20 square, corners at (17,30) (83,30) (83,70) (17,70).
+// Players stand just OUTSIDE their corner so every cone stays visible.
+const pTL = p(12,27), pTR = p(88,27), pBR = p(88,73), pBL = p(12,73);
+
+// The spare, queued behind the top-left corner
+const Q = p(7,22);
+
+// "Just followed my pass" slots, outside the square, for the CLOCKWISE lap
+const bhTRcw = p(78,24), bhBRcw = p(89,66), bhBLcw = p(22,76), bhTLcw = p(11,34);
+// ...and for the COUNTER-CLOCKWISE lap
+const bhBLccw = p(11,66), bhBRccw = p(78,76), bhTRccw = p(89,34), bhTLccw = p(22,24);
+
+// 1-2 support positions — the passer travels the length of the pass and stops
+// a couple of strides OFF THE RECEIVER, close enough to be a real option but
+// far enough that the set-back and the lay-off are proper passes.
+// Counter-clockwise legs.
+const sBL = p(12,63), sBR = p(73,73), sTR = p(88,37), sTL = p(27,27);
+
+// Receive-on-the-run positions — the return is played into the path, bending
+// inside the yellow cone and finishing outside the dotted line, past the
+// corner and already heading for the next station.
+const rBL = p(24,77), rBR = p(90,64), rTR = p(78,21), rTL = p(10,36);
+
+// Ball positions
+const bTL = b(12,27), bTR = b(88,27), bBR = b(88,73), bBL = b(12,73);
+const bsBL = b(12,63), bsBR = b(73,73), bsTR = b(88,37), bsTL = b(27,27);
+const brBL = b(24,77), brBR = b(90,64), brTR = b(78,21), brTL = b(10,36);
+
+// ── Phases ────────────────────────────────────────────────────────────
+// blue[] is indexed by player number (1..5).
+const phases = [
+
+  // ── Basic pattern — round the square clockwise, follow your pass ────
+  {
+    label:"Team Set",
+    desc:"Five players, four cones. One on each corner of the 20×20, one spare queued behind the top-left. Ball starts top-left and the square works clockwise.",
+    blue: [pTL, pTR, pBR, pBL, Q],
+    ball: bTL, pass:null
+  },
+  {
+    label:"First Pass",
+    desc:"Two touch — one to control, one to pass. Play to the next corner and follow your pass; the spare steps onto the corner you've left.",
+    blue: [bhTRcw, pTR, pBR, pBL, pTL],
+    ball: bTR, pass:[pTL,pTR]
+  },
+  {
+    label:"Second Pass",
+    desc:"Down the right side. Open the body before the ball arrives so the second touch is already travelling the right way.",
+    blue: [pTR, bhBRcw, pBR, pBL, pTL],
+    ball: bBR, pass:[pTR,pBR]
+  },
+  {
+    label:"Third Pass",
+    desc:"Along the bottom. Square corners mean the ball changes direction 90° every time — the first touch has to do that work.",
+    blue: [pTR, pBR, bhBLcw, pBL, pTL],
+    ball: bBL, pass:[pBR,pBL]
+  },
+  {
+    label:"Back to the Start",
+    desc:"Up the left side and the ball is home. Everyone has moved on one corner and the lap repeats.",
+    blue: [pTR, pBR, pBL, Q, pTL],
+    ball: bTL, pass:[pBL,pTL]
+  },
+
+  // ── Progression 1 — same pattern the other way round ────────────────
+  {
+    label:"Opposite Way — First Pass",
+    banner:"Progression 1",
+    desc:"Progression 1: same square, opposite direction. Now it runs counter-clockwise, so every player receives on the other side and passes off the other foot.",
+    blue: [pTR, pBR, pBL, pTL, bhBLccw],
+    ball: bBL, pass:[pTL,pBL]
+  },
+  {
+    label:"Opposite Way — Second Pass",
+    desc:"Along the bottom, left to right. The turn is the same 90° but towards the other shoulder — that's the whole point of the reversal.",
+    blue: [pTR, pBR, bhBRccw, pTL, pBL],
+    ball: bBR, pass:[pBL,pBR]
+  },
+  {
+    label:"Opposite Way — Third Pass",
+    desc:"Up the right side. Follow your pass every time — the movement is what makes it a passing exercise rather than a passing drill.",
+    blue: [pTR, bhTRccw, pBR, pTL, pBL],
+    ball: bTR, pass:[pBR,pTR]
+  },
+  {
+    label:"Opposite Way — Complete",
+    desc:"Back along the top to the start. Run both directions for equal reps before moving on.",
+    blue: [Q, pTR, pBR, pTL, pBL],
+    ball: bTL, pass:[pTR,pTL]
+  },
+
+  // ── Progression 2 — a 1-2 at every corner ───────────────────────────
+  // Three phases per corner so all three passes actually travel:
+  //   1) player 1 passes in and travels with it to support off player 2
+  //   2) player 2 sets it back first time
+  //   3) player 1 plays it into player 2's path — inside the cone, out past
+  //      the dotted line — and player 2 runs onto it.
+  {
+    label:"1-2 — Ball In",
+    banner:"Progression 2",
+    desc:"Progression 2: every corner becomes a 1-2. Play in and travel with the pass, right up to within a stride or two of the receiver.",
+    blue: [Q, pTR, pBR, sBL, pBL],
+    ball: bBL, pass:[pTL,pBL]
+  },
+  {
+    label:"1-2 — Set Back",
+    desc:"The set. One touch straight back into the player who has come to meet it — no control, no delay.",
+    blue: [Q, pTR, pBR, sBL, pBL],
+    ball: bsBL, pass:[pBL,sBL]
+  },
+  {
+    label:"1-2 — Into the Path",
+    desc:"The return goes into the path, never to the feet — inside the yellow cone and back out past the dotted line, where the receiver runs onto it already facing the next corner. The spare steps onto the top-left.",
+    blue: [pTL, pTR, pBR, sBL, rBL],
+    ball: brBL, pass:[sBL,rBL,-14]
+  },
+  {
+    label:"1-2 — Ball In",
+    desc:"Same again along the bottom — played in on the move, and the passer travels with it. The supporting player steps onto the corner that's just been vacated.",
+    blue: [pTL, pTR, pBR, pBL, sBR],
+    ball: bBR, pass:[rBL,pBR]
+  },
+  {
+    label:"1-2 — Set Back",
+    desc:"Set it back first time. On a 20×20 that's a long run to make — go the moment the pass leaves your foot.",
+    blue: [pTL, pTR, pBR, pBL, sBR],
+    ball: bsBR, pass:[pBR,sBR]
+  },
+  {
+    label:"1-2 — Into the Path",
+    desc:"Bent inside the cone and out past the line again, so the receiver is already running up the right side.",
+    blue: [pTL, pTR, rBR, pBL, sBR],
+    ball: brBR, pass:[sBR,rBR,-14]
+  },
+  {
+    label:"1-2 — Ball In",
+    desc:"Up the right side. Firm into the back foot — a soft one lets the set-back die.",
+    blue: [pTL, pTR, sTR, pBL, pBR],
+    ball: bTR, pass:[rBR,pTR]
+  },
+  {
+    label:"1-2 — Set Back",
+    desc:"The set back again — one touch, every time. That's the standard for the whole exercise.",
+    blue: [pTL, pTR, sTR, pBL, pBR],
+    ball: bsTR, pass:[pTR,sTR]
+  },
+  {
+    label:"1-2 — Into the Path",
+    desc:"Inside the cone, out past the line, away along the top. The passer stays in behind that corner.",
+    blue: [pTL, rTR, sTR, pBL, pBR],
+    ball: brTR, pass:[sTR,rTR,-14]
+  },
+  {
+    label:"1-2 — Ball In",
+    desc:"Last corner of the lap — the ball goes in to the player on the top-left, and the passer travels all the way in to support.",
+    blue: [pTL, sTL, pTR, pBL, pBR],
+    ball: bTL, pass:[rTR,pTL]
+  },
+  {
+    label:"1-2 — Set Back",
+    desc:"Set back into the player who has stepped in from the previous corner.",
+    blue: [pTL, sTL, pTR, pBL, pBR],
+    ball: bsTL, pass:[pTL,sTL]
+  },
+  {
+    label:"1-2 Complete",
+    desc:"Final return bent inside the top-left cone and out past the line — everyone has moved on one corner and the ball is running away from the start, ready for the next lap. Four 1-2s per lap, no stopping.",
+    blue: [rTL, sTL, pTR, pBL, pBR],
+    ball: brTL, pass:[sTL,rTL,-14]
+  },
+
+  // ── Progression 3 — 1-2, then skip the next corner ──────────────────
+  // Identical opening, but instead of returning it to player 2, player 1 plays
+  // long past them into player 3. Player 2 leaves their cone at that moment and
+  // runs into support off player 3, who lays it off — and player 2 then plays
+  // long into player 4. Nobody queues: four on the cones, one always running in.
+  {
+    label:"Ball In",
+    banner:"Progression 3",
+    desc:"Progression 3. It starts exactly the same: play in, travel with the pass, support off the receiver.",
+    blue: [sBL, sTL, pTR, pBL, pBR],
+    ball: bBL, pass:[rTL,pBL]
+  },
+  {
+    label:"Set Back",
+    desc:"Set back first time, same as before. Everything up to here is Progression 2.",
+    blue: [sBL, sTL, pTR, pBL, pBR],
+    ball: bsBL, pass:[pBL,sBL]
+  },
+  {
+    label:"Play Past to the Third",
+    desc:"Here's the difference. Instead of returning it, player 1 plays long past the second corner into the third. As the pass leaves, player 2 breaks off their cone to support the receiver — and player 1 fills the corner player 2 has just left.",
+    blue: [pBL, pTL, pTR, sBR, pBR],
+    ball: bBR, pass:[sBL,pBR]
+  },
+  {
+    label:"Lay Off",
+    desc:"The third corner lays it off first time into player 2, who has arrived in support. Same picture as the set-back — different pair of players.",
+    blue: [pBL, pTL, pTR, sBR, pBR],
+    ball: bsBR, pass:[pBR,sBR]
+  },
+  {
+    label:"Play Past to the Fourth",
+    desc:"Player 2 now plays long into the fourth corner, the third breaks off to support, and player 2 fills the corner behind. The pattern is rolling.",
+    blue: [pBL, pTL, pTR, pBR, sTR],
+    ball: bTR, pass:[sBR,pTR]
+  },
+  {
+    label:"Lay Off",
+    desc:"Laid off first time again. One touch on every lay-off — that's what keeps the rhythm.",
+    blue: [pBL, pTL, pTR, pBR, sTR],
+    ball: bsTR, pass:[pTR,sTR]
+  },
+  {
+    label:"Play Past to the Top",
+    desc:"Long again, back into the top-left. The fourth breaks off to support and the corner behind gets filled.",
+    blue: [pBL, pTL, sTL, pBR, pTR],
+    ball: bTL, pass:[sTR,pTL]
+  },
+  {
+    label:"Lay Off",
+    desc:"Laid off into the supporting player at the top of the square.",
+    blue: [pBL, pTL, sTL, pBR, pTR],
+    ball: bsTL, pass:[pTL,sTL]
+  },
+  {
+    label:"Complete",
+    desc:"Long into the second corner and the lap is closed — same shape as where Progression 3 started, one player further round. Four on the cones, one always running in to support, no queue at all.",
+    blue: [pBL, sBL, pTL, pBR, pTR],
+    ball: bBL, pass:[sTL,pBL]
+  }
+];
+
+// ── Create DOM ────────────────────────────────────────────────────────
+const scene = document.querySelector('.scene');
+const els = { blue:[], ball:null };
+
+function createAll(){
+  ['1','2','3','4','5'].forEach(n=>{
+    const el = document.createElement('div');
+    el.className = 'player blue';
+    el.textContent = n;
+    scene.appendChild(el);
+    els.blue.push(el);
+  });
+  const ball = document.createElement('div');
+  ball.className = 'ball';
+  scene.appendChild(ball);
+  els.ball = ball;
+}
+
+// ── Render phase ──────────────────────────────────────────────────────
+let current=0, isAuto=false, timer=null;
+
+// spec = [fromPos, toPos, curve?] — curve is a perpendicular bow in px, signed
+// so the return always bends to the inside of the cone.
+function drawPass(id, spec){
+  const el = document.getElementById(id);
+  if(!spec){ el.setAttribute('d',''); return; }
+  const f = ctr(spec[0]), t = ctr(spec[1]), c = spec[2] || 0;
+  if(!c){ el.setAttribute('d', `M${f[0]},${f[1]} L${t[0]},${t[1]}`); return; }
+  const mx=(f[0]+t[0])/2, my=(f[1]+t[1])/2;
+  const dx=t[0]-f[0], dy=t[1]-f[1], len=Math.hypot(dx,dy)||1;
+  const nx=-dy/len, ny=dx/len;
+  el.setAttribute('d', `M${f[0]},${f[1]} Q${mx+nx*c},${my+ny*c} ${t[0]},${t[1]}`);
+}
+
+function applyPhase(idx){
+  const ph = phases[idx];
+
+  els.blue.forEach((el,i)=>{
+    el.style.left = ph.blue[i][0]+'px';
+    el.style.top  = ph.blue[i][1]+'px';
+  });
+
+  els.ball.style.left = ph.ball[0]+'px';
+  els.ball.style.top  = ph.ball[1]+'px';
+
+  drawPass('pass', ph.pass);
+  document.getElementById('svgPass').classList.toggle('show', !!ph.pass);
+
+  // Progression banner — re-trigger the flash each time we land on the phase
+  const bn = document.getElementById('banner');
+  bn.className = 'banner';
+  if(ph.banner){
+    bn.textContent = ph.banner;
+    if(ph.bannerLong) bn.classList.add('long');
+    void bn.offsetWidth;          // force reflow so the animation restarts
+    bn.classList.add('show');
+  }
+
+  document.getElementById('phaseLabel').textContent = ph.label;
+  document.getElementById('desc').textContent = ph.desc;
+
+  document.querySelectorAll('.step-dot').forEach((d,i)=>{
+    d.classList.toggle('active', i===idx);
+    d.classList.toggle('done',   i<idx);
+  });
+  document.getElementById('prevBtn').style.opacity = idx===0 ? '0.3':'1';
+  document.getElementById('nextBtn').style.opacity = idx===phases.length-1 ? '0.3':'1';
+}
+
+function changePhase(dir){
+  const next = Math.max(0, Math.min(phases.length-1, current+dir));
+  if(next!==current){ current=next; applyPhase(current); }
+  if(current===phases.length-1 && isAuto) stopAuto();
+}
+
+function toggleAuto(){
+  if(isAuto){ stopAuto(); return; }
+  isAuto=true;
+  document.getElementById('playBtn').textContent='⏸ Pause';
+  if(current===phases.length-1){ current=0; applyPhase(0); }
+  timer=setInterval(()=>{
+    if(current<phases.length-1){ current++; applyPhase(current); }
+    else stopAuto();
+  }, 2400);
+}
+
+function stopAuto(){
+  isAuto=false; clearInterval(timer);
+  document.getElementById('playBtn').textContent='▶ Auto';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+phases.forEach(()=>{
+  const d=document.createElement('div');
+  d.className='step-dot';
+  document.getElementById('stepDots').appendChild(d);
+});
+
+createAll();
+applyPhase(0);
+</script>
+</body>
+</html>
